@@ -6,6 +6,8 @@ import io
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 
+import urllib.parse
+
 import numpy as np
 from PIL import Image, ImageOps
 from sklearn.model_selection import train_test_split
@@ -164,8 +166,11 @@ def load_dataset_from_hf(
         }
     if split not in splits_map:
         raise ValueError(f"Unknown split {split}.")
-    parquet_path = base_url.rstrip("/") + "/" + splits_map[split]
-    df = pl.read_parquet(parquet_path)
+            # Ensure base_url is decoded and stripped of trailing slashes
+        base_url = urllib.parse.unquote(base_url.rstrip("/"))
+        parquet_path = base_url + "/" + splits_map[split]
+        df = pl.read_parquet(parquet_path, storage_options={"token": os.getenv("HUGGINGFACE_TOKEN")})
+    
     if max_rows is not None:
         df = df.head(max_rows)
     label_col = None
