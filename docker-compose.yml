@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  framework-app:
+    build: .
+    container_name: framework-app
+    ports:
+      - "8501:8501"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      FRAMEWORK_DB_URL: ${FRAMEWORK_DB_URL}
+    restart: always
