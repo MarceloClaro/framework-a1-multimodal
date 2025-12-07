@@ -9,7 +9,6 @@ from utils.training import (
     evaluate_model,
     save_model,
     hyperparameter_search,
-    load_dataset_from_hf,
 )
 
 st.set_page_config(page_title="Treinamento do Modelo", layout="wide")
@@ -17,53 +16,88 @@ st.title("Treinamento do Modelo de Classificacao em Dermatologia")
 
 st.markdown(
     """
-    Esta pagina permite treinar um modelo de classificacao de imagens a partir de um
-    conjunto de dados. O modelo usa um perceptron multicamadas (MLP) do scikit-learn,
-    com early stopping e data augmentation opcional para balancear classes.
- 
-dataset_path = st.text_input("Diretorio do dataset (ou URL hf://)", value="hf://datasets/marmal88/skin_cancer/")
-augment = st.checkbox("Balancear classes via data augmentation", value=True)
- 
+    Esta página permite treinar um modelo de classificação de imagens de pele para uso em residência médica de dermatologia.
+    O modelo utiliza um perceptron multicamadas (MLP) do scikit‑learn, com early stopping e possibilidade de balanceamento de classes por meio de data augmentation.
+    Por padrão, o dataset é carregado do repositório Hugging Face (HAM10000) e as classes são balanceadas via data augmentation.
+    """
+)
+
+# Input parameters
+dataset_path = st.text_input(
+    "Diretório do dataset (ou URL hf://)",
+    value="hf://datasets/marmal88/skin_cancer/",
+    help="Caminho local para o diretório com subpastas por classe ou URL hf:// para o dataset"
+)
+augment = st.checkbox(
+    "Balancear classes via data augmentation (equaliza classes)",
+    value=True,
+)
+
 col1, col2, col3 = st.columns(3)
 with col1:
-    test_size = st.slider("Proporcao do conjunto de teste", 0.1, 0.4, 0.2, 0.05)
+    test_size = st.slider("Proporção do conjunto de teste", min_value=0.1, max_value=0.4, value=0.2, step=0.05)
 with col2:
-    val_size = st.slider("Proporcao da validacao", 0.05, 0.3, 0.1, 0.05)
+    val_size = st.slider(
+        "Proporção do conjunto de validação (dentro do restante)", min_value=0.05, max_value=0.3, value=0.1, step=0.05
+    )
 with col3:
-    image_size = st.number_input("Lado das imagens (px)", 32, 128, 64, 16)
+    image_size = st.number_input(
+        "Lado das imagens (pixels)", min_value=32, max_value=128, value=64, step=16,
+        help="Imagens serão redimensionadas para N×N pixels"
+    )
 
-hidden_layers_str = st.text_input("Camadas ocultas (separadas por virgula)", "256,128")
-learning_rate = st.number_input("Taxa de aprendizado", 0.0001, 0.01, 0.001, 0.0001, format="%f")
-batch_size = st.number_input("Tamanho do batch", 16, 512, 64, 16)
-max_epochs = st.number_input("Numero maximo de epocas", 5, 200, 50, 5)
-early_stopping_patience = st.number_input("Paciencia para early stopping", 1, 20, 5, 1)
+hidden_layers_str = st.text_input(
+    "Tamanhos das camadas ocultas (separadas por vírgula)", value="256,128",
+    help="Exemplo: 256,128 cria duas camadas de 256 e 128 neurônios"
+)
+learning_rate = st.number_input(
+    "Taxa de aprendizado (learning rate)", min_value=0.0001, max_value=0.01, value=0.001, step=0.0001, format="%f"
+)
+batch_size = st.number_input(
+    "Tamanho do batch", min_value=16, max_value=512, value=64, step=16
+)
+max_epochs = st.number_input(
+    "Número máximo de épocas", min_value=5, max_value=200, value=50, step=5
+)
+early_stopping_patience = st.number_input(
+    "Paciência para early stopping", min_value=1, max_value=20, value=5, step=1
+)
 
-search_hyperparams = st.checkbox("Executar busca de hiperparametros", value=False)
+# Option to perform hyperparameter search
+search_hyperparams = st.checkbox(
+    "Executar busca de hiperparâmetros", value=False,
+    help="Se marcada, será executada uma busca simples sobre combinações de parâmetros."
+)
 
 if search_hyperparams:
+    # Inputs for hyperparameter options
     hidden_layers_options_str = st.text_input(
-        "Opcoes de camadas ocultas", "256,128;512,256;128,64"
+        "Opções de camadas ocultas (separe combinações por ponto e vírgula)",
+        value="256,128;512,256;128,64",
+        help="Cada combinação é uma sequência de inteiros separados por vírgula; diferentes combinações são separadas por ponto e vírgula."
     )
     learning_rate_options_str = st.text_input(
-        "Opcoes de learning rates", "0.001;0.0005"
+        "Opções de learning rates (separadas por ponto e vírgula)",
+        value="0.001;0.0005",
     )
     batch_size_options_str = st.text_input(
-        "Opcoes de tamanhos de batch", "32;64"
+        "Opções de tamanhos de batch (separados por ponto e vírgula)",
+        value="32;64",
     )
 
 train_button = st.button("Treinar modelo")
 
 if train_button:
-    if dataset_path.strip().lower().startswith("hf://"):
-        data_loader = "hf"
-    else:
-        data_loader = "local"
-    if data_loader == "local" and not os.path.isdir(dataset_path):
-        st.error(f"Diretorio '{dataset_path}' nao encontrado.")
+    # Ensure the dataset path exists or is remote
+    if not dataset_path.strip().lower().startswith("hf://") and not os.path.isdir(dataset_path):
+        st.error(f"Diretório '{dataset_path}' não encontrado. Por favor, verifique o caminho ou prefixo hf://")
     else:
         try:
             with st.spinner("Carregando e preparando o dataset..."):
-                if data_loader == "hf":
+                # Se o caminho começar com 'hf://', use carregador HuggingFace via Polars
+                if dataset_path.strip().lower().startswith("hf://"):
+                    from utils.training import load_dataset_from_hf
+                    # Use apenas o split de treino; split_dataset fará a divisão
                     X, y, class_names = load_dataset_from_hf(
                         base_url=dataset_path,
                         split="train",
@@ -84,15 +118,19 @@ if train_button:
                     random_state=42,
                 )
 
+            # Hyperparameter search or single training
             if search_hyperparams:
+                # Parse options
+                # Hidden layers options: split by ';' then parse each comma-separated tuple
                 hidden_options: List[Tuple[int, ...]] = []
                 for combo in hidden_layers_options_str.split(";"):
                     combo = combo.strip()
                     if combo:
                         try:
-                            hidden_options.append(tuple(int(x.strip()) for x in combo.split(",") if x.strip()))
+                            hl = tuple(int(x.strip()) for x in combo.split(",") if x.strip())
+                            hidden_options.append(hl)
                         except Exception:
-                            pass
+                            continue
                 lr_options = []
                 for lr_str in learning_rate_options_str.split(";"):
                     lr_str = lr_str.strip()
@@ -100,7 +138,7 @@ if train_button:
                         try:
                             lr_options.append(float(lr_str))
                         except Exception:
-                            pass
+                            continue
                 bs_options = []
                 for bs_str in batch_size_options_str.split(";"):
                     bs_str = bs_str.strip()
@@ -108,14 +146,14 @@ if train_button:
                         try:
                             bs_options.append(int(bs_str))
                         except Exception:
-                            pass
+                            continue
                 if not hidden_options:
-                    hidden_options = [tuple(int(x.strip()) for x in hidden_layers_str.split(",") if x.strip())]
+                    hidden_options = [(256, 128)]
                 if not lr_options:
                     lr_options = [float(learning_rate)]
                 if not bs_options:
                     bs_options = [int(batch_size)]
-                with st.spinner("Realizando busca de hiperparametros..."):
+                with st.spinner("Realizando busca de hiperparâmetros..."):
                     (best_model, best_scaler, best_history), summary = hyperparameter_search(
                         X_train,
                         y_train,
@@ -130,11 +168,12 @@ if train_button:
                     )
                 model, scaler, history = best_model, best_scaler, best_history
             else:
-                try:
-                    hidden_layers = tuple(int(x.strip()) for x in hidden_layers_str.split(",") if x.strip())
-                except Exception:
-                    hidden_layers = (256, 128)
                 with st.spinner("Treinando modelo..."):
+                    # Parse hidden layers
+                    try:
+                        hidden_layers = tuple(int(x.strip()) for x in hidden_layers_str.split(",") if x.strip())
+                    except Exception:
+                        hidden_layers = (256, 128)
                     model, scaler, history = train_mlp_classifier(
                         X_train,
                         y_train,
@@ -148,21 +187,28 @@ if train_button:
                         random_state=42,
                     )
 
-            with st.spinner("Avaliando modelo no conjunto de teste..."):
-                metrics = evaluate_model(model, scaler, X_test, y_test, class_names)
-            model_path = os.path.join("results", "trained_model.pkl")
-            save_model(model, scaler, class_names, model_path)
-            st.success("Treinamento concluido! Modelo salvo em 'results/trained_model.pkl'.")
-            st.write(f"Acuracia no conjunto de teste: {metrics['accuracy']:.4f}")
-            report = metrics["report"]
-            report_df = {
-                "Classe": list(report.keys())[:-3],
-                "Precisao": [report[c]["precision"] for c in report if c in class_names],
-                "Revocacao": [report[c]["recall"] for c in report if c in class_names],
-                "F1": [report[c]["f1-score"] for c in report if c in class_names],
-                "Suporte": [report[c]["support"] for c in report if c in class_names],
-            }
-            st.table(report_df)
-            st.line_chart({"Treino": history["train_acc"], "Validacao": history["val_acc"]})
+            # Evaluate on test set
+            with st.spinner("Avaliando modelo..."):
+                test_acc, report = evaluate_model(
+                    model,
+                    scaler,
+                    X_test,
+                    y_test,
+                    class_names=class_names,
+                )
+            st.success(f"Acurácia no conjunto de teste: {test_acc * 100:.2f}%")
+
+            # Display classification report as a table
+            import pandas as pd
+
+            report_df = pd.DataFrame(report).transpose()
+            st.subheader("Relatório de Classificação")
+            st.dataframe(report_df.style.format(precision=2))
+
+            # Save model
+            with st.spinner("Salvando modelo..."):
+                save_model(model, scaler, class_names, path="results/trained_model.pkl")
+            st.success("Modelo salvo em results/trained_model.pkl")
+
         except Exception as e:
-            st.exception(e)
+            st.error(f"Erro ao treinar o modelo: {e}")
