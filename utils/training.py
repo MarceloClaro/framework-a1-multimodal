@@ -154,24 +154,19 @@ def load_dataset_from_hf(
     max_rows: int | None = None,
 ):
     try:
+        from datasets import load_dataset
         import polars as pl  # type: ignore
-        import fsspec  # type: ignore
     except Exception as exc:
-        raise RuntimeError("polars and fsspec are required.") from exc
-    if splits_map is None:
-        splits_map = {
-            "train": "data/train-*-of-*.parquet",
-            "validation": "data/validation-*-of-*.parquet",
-            "test": "data/test-00000-of-00001-61e7cf54bf274ae2.parquet",
-        }
-    if split not in splits_map:
-        raise ValueError(f"Unknown split {split}.")
-      # Ensure base_url is decoded and stripped of trailing slashes
-    base_url = urllib.parse.unquote(base_url.rstrip("/"))
-    parquet_path = base_url + "/" + splits_map[split]
-    df = pl.read_parquet(parquet_path, storage_options={"token": os.getenv("HUGGINGFACE_TOKEN")})
-          
-    
+        raise RuntimeError("datasets and polars are required.") from exc
+    # Extract repo name from base_url, assuming hf://datasets/repo_name
+    if base_url.startswith("hf://datasets/"):
+        repo_name = base_url[len("hf://datasets/"):]
+    else:
+        repo_name = base_url
+    # Load dataset
+    dataset = load_dataset(repo_name, split=split)
+    # Convert to polars DataFrame
+    df = pl.from_pandas(dataset.to_pandas())
     if max_rows is not None:
         df = df.head(max_rows)
     label_col = None
