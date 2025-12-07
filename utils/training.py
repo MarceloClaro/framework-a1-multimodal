@@ -166,10 +166,11 @@ def load_dataset_from_hf(
         }
     if split not in splits_map:
         raise ValueError(f"Unknown split {split}.")
-            # Ensure base_url is decoded and stripped of trailing slashes
-        base_url = urllib.parse.unquote(base_url.rstrip("/"))
-        parquet_path = base_url + "/" + splits_map[split]
-        df = pl.read_parquet(parquet_path, storage_options={"token": os.getenv("HUGGINGFACE_TOKEN")})
+      # Ensure base_url is decoded and stripped of trailing slashes
+    base_url = urllib.parse.unquote(base_url.rstrip("/"))
+    parquet_path = base_url + "/" + splits_map[split]
+    df = pl.read_parquet(parquet_path, storage_options={"token": os.getenv("HUGGINGFACE_TOKEN")})
+          
     
     if max_rows is not None:
         df = df.head(max_rows)
