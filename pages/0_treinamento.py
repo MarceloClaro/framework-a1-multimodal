@@ -13,18 +13,17 @@ from utils.training import (
 )
 
 st.set_page_config(page_title="Treinamento do Modelo", layout="wide")
-st.title("Treinamento do Modelo de Classificacao")
+st.title("Treinamento do Modelo de Classificacao em Dermatologia")
 
 st.markdown(
     """
     Esta pagina permite treinar um modelo de classificacao de imagens a partir de um
     conjunto de dados. O modelo usa um perceptron multicamadas (MLP) do scikit-learn,
     com early stopping e data augmentation opcional para balancear classes.
-    """
-)
-
-dataset_path = st.text_input("Diretorio do dataset", value="/path/to/skin_cancer_dataset")
+ 
+dataset_path = st.text_input("Diretorio do dataset (ou URL hf://)", value="hf://datasets/marmal88/skin_cancer/")
 augment = st.checkbox("Balancear classes via data augmentation", value=True)
+ 
 col1, col2, col3 = st.columns(3)
 with col1:
     test_size = st.slider("Proporcao do conjunto de teste", 0.1, 0.4, 0.2, 0.05)
