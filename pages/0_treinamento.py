@@ -13,7 +13,7 @@ from utils.training import (
 )
 
 st.set_page_config(page_title="Treinamento do Modelo", layout="wide")
-st.title("\ud83d\udd27 Treinamento do Modelo de Classificacao")
+st.title("Treinamento do Modelo de Classificacao")
 
 st.markdown(
     """
