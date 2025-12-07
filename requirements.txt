@@ -6,3 +6,7 @@ pandas
 sqlalchemy
 psycopg2-binary
 ray
+scikit-learn
+joblib
+polars
+fsspec
